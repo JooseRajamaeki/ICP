@@ -1,0 +1,3 @@
+The project uses the Eigen library which is also included in the repository. See http://eigen.tuxfamily.org for Eigen's licencing information.
+
+The repository contains the MNIST data set. See http://yann.lecun.com/exdb/mnist/ for permissions.
