@@ -13,6 +13,8 @@ input_dimension = 6
 output_dimension = 2
 conditioning_dimension = 0
 
+########### Making the neural network ###########
+
 hidden_dimension = 100
 
 learning_rate = 0.001
@@ -64,18 +66,15 @@ loss = tf.reduce_sum(tf.square(y-y_))
 train_step_tensorflow = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
 
+########### Initializing the neural network ###########
+
+
 sess = tf.InteractiveSession()
 tf.global_variables_initializer().run()
 
+########### Plotting sample input noise ###########
 
 amount_data = 1000
-W_true = np.random.rand(input_dimension,output_dimension)
-b_true = np.random.rand(output_dimension)
-
-
-
-
-
 x_data = np.random.randn(amount_data,input_dimension)
 
 plt.scatter(x_data[:,0], x_data[:,1],s=marker_size)
@@ -88,8 +87,9 @@ time.sleep(2.0);
 plt.close('all')
 plt.ioff()
 
-y_data = np.random.rand(amount_data,output_dimension)
+########### Creating training data ###########
 
+y_data = np.random.rand(amount_data,output_dimension)
 
 
 y_data[0:round(amount_data/2),0] = y_data[0:round(amount_data/2),0] + 2
@@ -100,6 +100,9 @@ y_data[:,0] = y_data[:,0]*7.0
 corruption_noise = np.random.randn(amount_data,1) * 0.1
 y_data[:,1] = np.sin(y_data[:,0])+corruption_noise[:,0]
 '''
+
+
+########### Defining the training step of the algorithm ###########
 
 def distribution_training_step(true_data,input_noise):
 
@@ -134,6 +137,9 @@ def distribution_training_step(true_data,input_noise):
         train_data = true_data[index,:]
 
         sess.run(train_step_tensorflow, feed_dict={x: train_noise, y_: train_data})
+
+
+########### Actual training ###########
 
 
 for iteration in range(10000):
