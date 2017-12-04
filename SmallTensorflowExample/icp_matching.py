@@ -42,7 +42,6 @@ def matching(true_data,generated_data):
         matched_index[true_idx] = best_idx
 
 
-
     return matched_index
 
 

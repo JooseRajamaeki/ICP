@@ -5,11 +5,14 @@ import numpy as np
 from matplotlib import pyplot as plt
 from icp_matching import matching
 import time
+from enum import Enum
 
 marker_size = 1
 
 input_dimension = 6
 output_dimension = 2
+conditioning_dimension = 0
+
 hidden_dimension = 100
 
 learning_rate = 0.001
@@ -86,19 +89,51 @@ plt.close('all')
 plt.ioff()
 
 y_data = np.random.rand(amount_data,output_dimension)
+
+
+
 y_data[0:round(amount_data/2),0] = y_data[0:round(amount_data/2),0] + 2
 y_data[0:round(amount_data/2),1] = y_data[0:round(amount_data/2),1] - 1
 
+'''
+y_data[:,0] = y_data[:,0]*7.0
+corruption_noise = np.random.randn(amount_data,1) * 0.1
+y_data[:,1] = np.sin(y_data[:,0])+corruption_noise[:,0]
+'''
 
 def distribution_training_step(true_data,input_noise):
 
+    if conditioning_dimension > 0:
+        input_noise[:,0:conditioning_dimension] = true_data[:,0:conditioning_dimension]
+
     generated_data = sess.run(y, feed_dict={x: input_noise})
+
+    if conditioning_dimension > 0:
+        generated_data[:,0:conditioning_dimension] = true_data[:,0:conditioning_dimension]
 
     matched_indexes = matching(true_data,generated_data)
 
     input_noise = input_noise[matched_indexes,:]
 
-    sess.run(train_step_tensorflow, feed_dict={x: input_noise, y_: true_data})
+    if conditioning_dimension > 0:
+        input_noise[:,0:conditioning_dimension] = true_data[:,0:conditioning_dimension]
+
+
+    minibatch_size = round(amount_data / 10)
+    num_minibatches = round(amount_data/minibatch_size)
+
+    if num_minibatches * minibatch_size < amount_data:
+        num_minibatches = num_minibatches + 1
+
+    for batch_idx in range(num_minibatches):
+        index = np.arange(amount_data)
+        np.random.shuffle(index)
+        index = index[0:minibatch_size]
+
+        train_noise = input_noise[index,:]
+        train_data = true_data[index,:]
+
+        sess.run(train_step_tensorflow, feed_dict={x: train_noise, y_: train_data})
 
 
 for iteration in range(10000):
@@ -107,7 +142,15 @@ for iteration in range(10000):
     print(iteration)
     if iteration % 100 == 0:
         x_data = np.random.randn(amount_data,input_dimension)
+
+        if conditioning_dimension > 0:
+            x_data[:,0:conditioning_dimension] = y_data[:,0:conditioning_dimension]
+        
         predictions = sess.run(y, feed_dict={x: x_data})
+
+        if conditioning_dimension > 0:
+            predictions[:,0:conditioning_dimension] = y_data[:,0:conditioning_dimension]
+        
         true_data = plt.scatter(y_data[:,0], y_data[:,1],s=marker_size)
         generated_data = plt.scatter(predictions[:,0], predictions[:,1],s=marker_size)
         plt.legend([true_data, generated_data], ['True data', 'Generated data'])
