@@ -29,7 +29,7 @@ for i in range(hidden_dimension):
     else:
         every_other.append(-1.0)
 
-comb  = tf.Variable(every_other, tf.float32)
+comb  = tf.constant(every_other, tf.float32)
 
 
 x = tf.placeholder(tf.float32, [None, input_dimension])
