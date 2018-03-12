@@ -19,7 +19,7 @@ hidden_dimension = 100
 
 learning_rate = 0.001
 init_weight_scale = 0.1
-max_seed_gradient_norm = 0.01
+max_gradient_norm = 0.1
 
 
 every_other = []
@@ -63,8 +63,10 @@ loss = tf.reduce_sum(tf.square(y-y_))
 
 
 
-train_step_tensorflow = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
-
+optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+gvs = optimizer.compute_gradients(loss)
+capped_gvs = [(tf.clip_by_value(grad, -max_gradient_norm, max_gradient_norm), var) for grad, var in gvs]
+train_op = optimizer.apply_gradients(capped_gvs)
 
 ########### Initializing the neural network ###########
 
@@ -136,8 +138,7 @@ def distribution_training_step(true_data,input_noise):
         train_noise = input_noise[index,:]
         train_data = true_data[index,:]
 
-        sess.run(train_step_tensorflow, feed_dict={x: train_noise, y_: train_data})
-
+        sess.run(train_op, feed_dict={x: train_noise, y_: train_data})
 
 ########### Actual training ###########
 
