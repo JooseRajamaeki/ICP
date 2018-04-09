@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 from icp_matching import matching
 import time
 from enum import Enum
+import random
 
 marker_size = 1
 
@@ -107,6 +108,10 @@ y_data[:,1] = np.sin(y_data[:,0])+corruption_noise[:,0]
 ########### Defining the training step of the algorithm ###########
 
 def distribution_training_step(true_data,input_noise):
+
+    shuffle_idx = np.arange(amount_data)
+    random.shuffle(shuffle_idx)
+    true_data = true_data[shuffle_idx,:]
 
     if conditioning_dimension > 0:
         input_noise[:,0:conditioning_dimension] = true_data[:,0:conditioning_dimension]
