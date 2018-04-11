@@ -1,1 +1,1 @@
-The codes in this repository implement algorithms described in the paper "An Iterative Closest Points Approach to Neural Generative Models", which is also included in the repository. The algorithms train neural networks to learn mappings between distributions.
+The codes in this repository implement algorithms described in the paper "An Iterative Closest Points Approach to Neural Generative Models" (https://arxiv.org/abs/1711.06562). The algorithms train neural networks to learn mappings between distributions.
