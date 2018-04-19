@@ -130,20 +130,24 @@ def distribution_training_step(true_data,input_noise):
 
 
     minibatch_size = round(amount_data / 10)
-    num_minibatches = round(amount_data/minibatch_size)
+    
+    index = np.arange(amount_data)
+    np.random.shuffle(index)
 
-    if num_minibatches * minibatch_size < amount_data:
-        num_minibatches = num_minibatches + 1
+    assert(amount_data % minibatch_size == 0)
 
-    for batch_idx in range(num_minibatches):
-        index = np.arange(amount_data)
-        np.random.shuffle(index)
-        index = index[0:minibatch_size]
+    while len(index) > 0:
 
-        train_noise = input_noise[index,:]
-        train_data = true_data[index,:]
+        del_index = np.arange(minibatch_size)
+
+        train_index = index[del_index]
+
+        train_noise = input_noise[train_index,:]
+        train_data = true_data[train_index,:]
 
         sess.run(train_op, feed_dict={x: train_noise, y_: train_data})
+
+        index = np.delete(index,del_index,axis=0)
 
 ########### Actual training ###########
 
