@@ -459,6 +459,7 @@ public:
 	void train_input_normalization(const float** in, unsigned data_points);
 	void train_bernoulli_classifier_adam(const float** in, const float** out, unsigned data_points, unsigned minibatch_size);
 	void incremental_matching(const float** noise, const float** data, unsigned conditioning_dim, unsigned noise_dim, unsigned data_points, unsigned minibatch_size, int supervised_minibatch_size, float (*distance_measure)(const float* pt1,const float* pt2) = nullptr, void (*distance_measure_gradient)(const float* prediction, const float* true_val, float* gradient) = nullptr);
+	void alternating_incremental_matching(const float** noise, const float** data, unsigned conditioning_dim, unsigned noise_dim, unsigned data_points, unsigned minibatch_size, int supervised_minibatch_size, float(*distance_measure)(const float* pt1, const float* pt2) = nullptr, void(*distance_measure_gradient)(const float* prediction, const float* true_val, float* gradient) = nullptr);
 	void hausdorff_matching(const float** noise, const float** data, unsigned conditioning_dim, unsigned noise_dim, unsigned data_points, unsigned minibatch_size, int supervised_minibatch_size, float(*distance_measure)(const float* pt1, const float* pt2) = nullptr, void(*distance_measure_gradient)(const float* prediction, const float* true_val, float* gradient) = nullptr);
 
 	void write_to_file(std::string filename);

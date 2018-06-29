@@ -153,8 +153,8 @@ void synthetic_data_test() {
 	//const int minibatch_size = data_amount/2;
 	//const int supervised_minibatch_size = 100;
 
-	int data_amount = 1000;
-	const int minibatch_size = 100;
+	int data_amount = 2000;
+	const int minibatch_size = 500;
 	const int supervised_minibatch_size = 100;
 
 
@@ -344,7 +344,7 @@ void synthetic_data_test() {
 			std::vector<float*> data_ptrs = vector_to_ptrs(data);
 			std::vector<float*> noise_ptrs = vector_to_ptrs(noise);
 
-			mlp->incremental_matching((const float**)noise_ptrs.data(), (const float**)data_ptrs.data(), conditioning_dim, noise_dim, data_ptrs.size(), minibatch_size, supervised_minibatch_size);
+			mlp->alternating_incremental_matching((const float**)noise_ptrs.data(), (const float**)data_ptrs.data(), conditioning_dim, noise_dim, data_ptrs.size(), minibatch_size, supervised_minibatch_size);
 
 		}
 

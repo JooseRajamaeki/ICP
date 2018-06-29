@@ -2301,6 +2301,292 @@ void MultiLayerPerceptron::incremental_matching(const float ** noise, const floa
 
 }
 
+
+void MultiLayerPerceptron::alternating_incremental_matching(const float ** noise, const float ** data, unsigned conditioning_dim, unsigned noise_dim, unsigned data_points, unsigned minibatch_size, int supervised_minibatch_size, float(*distance_measure)(const float *pt1, const float *pt2), void(*distance_measure_gradient)(const float *prediction, const float *true_val, float *gradient))
+{
+
+	const bool debug = false;
+
+	unsigned joint_dim = noise_dim + conditioning_dim;
+
+	assert(joint_dim == input_operation_->size_);
+	assert(conditioning_dim < output_operation_->size_);
+
+	int data_dim = output_operation_->size_;
+
+	if (minibatch_size > data_points) {
+		minibatch_size = data_points;
+	}
+
+	int number_of_batches = data_points / minibatch_size;
+
+	if (number_of_batches * minibatch_size < data_points) {
+		number_of_batches += 1;
+	}
+
+	for (int batch = 0; batch < number_of_batches; ++batch) {
+
+		std::vector<std::unique_ptr<Eigen::VectorXf>> data_batch;
+		std::vector<std::pair<std::unique_ptr<Eigen::VectorXf>, std::unique_ptr<Eigen::VectorXf>>> predictions_and_noises;
+
+
+		//Making data and predictions
+		for (int data_item = 0; data_item < minibatch_size; ++data_item) {
+
+			//Data item
+			{
+				int rand_idx = rand() % data_points;
+				if (minibatch_size == data_points) {
+					rand_idx = data_item;
+				}
+
+				Eigen::Map<const Eigen::VectorXf> data_map(data[rand_idx], data_dim);
+
+				std::unique_ptr<Eigen::VectorXf> datum = std::unique_ptr<Eigen::VectorXf>(new Eigen::VectorXf());
+				*datum = data_map;
+				data_batch.push_back(std::move(datum));
+			}
+
+			//Noise and prediction
+			{
+				int rand_idx = rand() % data_points;
+				if (minibatch_size == data_points) {
+					rand_idx = data_item;
+				}
+
+				std::unique_ptr<Eigen::VectorXf> noise_sample = std::unique_ptr<Eigen::VectorXf>(new Eigen::VectorXf());
+				noise_sample->resize(joint_dim);
+				if (conditioning_dim > 0) {
+					noise_sample->head(conditioning_dim) = data_batch.back()->head(conditioning_dim);
+				}
+				noise_sample->tail(noise_dim) = Eigen::Map<const Eigen::VectorXf>(noise[rand_idx], noise_dim);
+
+
+
+				std::unique_ptr<Eigen::VectorXf> prediction = std::unique_ptr<Eigen::VectorXf>(new Eigen::VectorXf());
+				prediction->resize(data_dim);
+
+				run(noise_sample->data(), prediction->data());
+
+				if (conditioning_dim > 0) {
+					prediction->head(conditioning_dim) = data_batch.back()->head(conditioning_dim);
+				}
+
+				predictions_and_noises.push_back(std::make_pair(std::move(prediction), std::move(noise_sample)));
+
+			}
+
+		}
+
+
+
+		std::vector<std::unique_ptr<Eigen::VectorXf>> training_noise_batch;
+		std::vector<std::unique_ptr<Eigen::VectorXf>> training_data_batch;
+
+		while (data_batch.size() > 0) {
+
+			if (sampleUniform<float>() < 0.5f) {
+
+
+				int selected_noise_idx = rand() % predictions_and_noises.size();
+				std::pair<std::unique_ptr<Eigen::VectorXf>, std::unique_ptr<Eigen::VectorXf>> pred_and_noise = std::move(predictions_and_noises[selected_noise_idx]);
+				predictions_and_noises.erase(predictions_and_noises.begin() + selected_noise_idx);
+
+				int best_idx = 0;
+				float best_match = std::numeric_limits<float>::infinity();
+
+				std::vector<std::pair<int, float>> best_matches;
+
+				auto second_is_better = [](const std::pair<int, float>& datum1, const std::pair<int, float>& datum2) {
+					return datum1.second < datum2.second;
+				};
+
+				int size = data_batch.size();
+#pragma omp parallel for num_threads(8)
+				for (int i = 0; i < size; ++i) {
+
+					const std::unique_ptr<Eigen::VectorXf>& datum = data_batch[i];
+
+					float match = 0.0f;
+					if (!distance_measure) {
+						match = (*datum - *(pred_and_noise.first)).norm();
+					}
+					else {
+						match = distance_measure(datum->data(), pred_and_noise.first->data());
+					}
+
+					if (match <= best_match) {
+#pragma omp critical
+						{
+							if (match <= best_match) {
+								best_match = match;
+								best_idx = i;
+
+								best_matches.push_back(std::make_pair(i, best_match));
+
+								std::sort(best_matches.begin(), best_matches.end(), second_is_better);
+								while (best_matches.back().second > best_matches.front().second) {
+									best_matches.pop_back();
+								}
+
+							}
+						}
+					}
+
+				}
+
+
+				if (best_matches.size() > 1) {
+					int rand_idx = rand() % best_matches.size();
+					best_idx = best_matches[rand_idx].first;
+				}
+
+
+				std::unique_ptr<Eigen::VectorXf> datum = std::move(data_batch[best_idx]);
+				data_batch.erase(data_batch.begin() + best_idx);
+
+				std::unique_ptr<Eigen::VectorXf> noise_datum = std::unique_ptr<Eigen::VectorXf>(nullptr);
+				pred_and_noise.second.swap(noise_datum);
+
+				if (conditioning_dim > 0) {
+					noise_datum->head(conditioning_dim) = datum->head(conditioning_dim);
+				}
+
+				training_noise_batch.push_back(std::move(noise_datum));
+				training_data_batch.push_back(std::move(datum));
+
+
+			}
+			else {
+
+				int selected_datum_idx = rand() % data_batch.size();
+				std::unique_ptr<Eigen::VectorXf> datum = std::move(data_batch[selected_datum_idx]);
+				data_batch.erase(data_batch.begin() + selected_datum_idx);
+
+				int best_idx = 0;
+				float best_match = std::numeric_limits<float>::infinity();
+
+				std::vector<std::pair<int, float>> best_matches;
+
+				auto second_is_better = [](const std::pair<int, float>& datum1, const std::pair<int, float>& datum2) {
+					return datum1.second < datum2.second;
+				};
+
+				int size = predictions_and_noises.size();
+#pragma omp parallel for num_threads(8)
+				for (int i = 0; i < size; ++i) {
+
+					const std::pair<std::unique_ptr<Eigen::VectorXf>, std::unique_ptr<Eigen::VectorXf>>& pred_and_noise = predictions_and_noises[i];
+
+					float match = 0.0f;
+					if (!distance_measure) {
+						match = (*datum - *(pred_and_noise.first)).norm();
+					}
+					else {
+						match = distance_measure(datum->data(), pred_and_noise.first->data());
+					}
+
+					if (match <= best_match) {
+#pragma omp critical
+						{
+							if (match <= best_match) {
+								best_match = match;
+								best_idx = i;
+
+								best_matches.push_back(std::make_pair(i, best_match));
+
+								std::sort(best_matches.begin(), best_matches.end(), second_is_better);
+								while (best_matches.back().second > best_matches.front().second) {
+									best_matches.pop_back();
+								}
+
+							}
+						}
+					}
+
+				}
+
+
+				if (best_matches.size() > 1) {
+					int rand_idx = rand() % best_matches.size();
+					best_idx = best_matches[rand_idx].first;
+				}
+
+
+				std::unique_ptr<Eigen::VectorXf> noise_datum = std::unique_ptr<Eigen::VectorXf>(nullptr);
+				predictions_and_noises[best_idx].second.swap(noise_datum);
+				predictions_and_noises.erase(predictions_and_noises.begin() + best_idx);
+
+				if (conditioning_dim > 0) {
+					noise_datum->head(conditioning_dim) = datum->head(conditioning_dim);
+				}
+
+				training_noise_batch.push_back(std::move(noise_datum));
+				training_data_batch.push_back(std::move(datum));
+
+			}
+		}
+
+
+		if (!distance_measure || !distance_measure_gradient) {
+
+			std::vector<float*> input_ptrs = vector_to_ptrs(training_noise_batch);
+			std::vector<float*> output_ptrs = vector_to_ptrs(training_data_batch);
+
+			train_adam((const float**)input_ptrs.data(), (const float**)output_ptrs.data(), output_ptrs.size(), supervised_minibatch_size);
+		}
+		else {
+
+			if (supervised_minibatch_size > training_data_batch.size()) {
+				supervised_minibatch_size = training_data_batch.size();
+			}
+
+			int supervised_batches = training_data_batch.size() / supervised_minibatch_size;
+
+			if (supervised_minibatch_size*supervised_batches < training_data_batch.size()) {
+				++supervised_batches;
+			}
+
+			std::vector<float*> input_ptrs;
+			std::vector<Eigen::VectorXf> gradients;
+
+			for (int supervised_batch = 0; supervised_batch < supervised_batches; ++supervised_batch) {
+
+				input_ptrs.clear();
+				gradients.clear();
+
+				Eigen::VectorXf prediction = Eigen::VectorXf::Zero(data_dim);
+				Eigen::VectorXf gradient = Eigen::VectorXf::Zero(data_dim);
+
+				for (int i = 0; i < supervised_minibatch_size; ++i) {
+
+					int rand_idx = i;
+					if (supervised_minibatch_size != minibatch_size) {
+						rand_idx = rand() % training_data_batch.size();
+					}
+
+					input_ptrs.push_back(training_noise_batch[rand_idx]->data());
+
+					run(input_ptrs[i], prediction.data());
+
+					distance_measure_gradient(prediction.data(), training_data_batch[rand_idx]->data(), gradient.data());
+					gradients.push_back(gradient);
+				}
+
+				std::vector<float*> gradient_ptrs = vector_to_ptrs(gradients);
+
+				const bool is_gradient = true;
+				train_adam((const float**)input_ptrs.data(), (const float**)gradient_ptrs.data(), input_ptrs.size(), input_ptrs.size(), is_gradient);
+
+			}
+
+		}
+
+	}
+
+}
+
+
 void MultiLayerPerceptron::hausdorff_matching(const float ** noise, const float ** data, unsigned conditioning_dim, unsigned noise_dim, unsigned data_points, unsigned minibatch_size, int supervised_minibatch_size, float(*distance_measure)(const float *pt1, const float *pt2), void(*distance_measure_gradient)(const float *prediction, const float *true_val, float *gradient))
 {
 
