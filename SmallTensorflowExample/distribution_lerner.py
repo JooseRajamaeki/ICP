@@ -1,12 +1,15 @@
-#This is a small sample code. The C++ implementation is much faster and better.
-
 import tensorflow as tf
 import numpy as np
 from matplotlib import pyplot as plt
-from icp_matching import matching
 import time
 from enum import Enum
 import random
+#This is a more didactic Python code to do the matching
+from icp_matching import matching
+#This is a C++ implementation of the matching procedure.
+#The example file was built for 64-bit Windows Python version 3.6
+#Use the Visual Studio project in folder "PythonModule" to build it yourself.
+import _icp_matcher as icp_matcher
 
 marker_size = 1
 
@@ -77,7 +80,7 @@ tf.global_variables_initializer().run()
 
 ########### Plotting sample input noise ###########
 
-amount_data = 1000
+amount_data = 10000
 x_data = np.random.randn(amount_data,input_dimension)
 
 plt.scatter(x_data[:,0], x_data[:,1],s=marker_size)
@@ -86,7 +89,7 @@ plt.title('Input noise')
 
 plt.ion()
 plt.show()
-time.sleep(2.0);
+time.sleep(2.0)
 plt.close('all')
 plt.ioff()
 
@@ -121,7 +124,10 @@ def distribution_training_step(true_data,input_noise):
     if conditioning_dimension > 0:
         generated_data[:,0:conditioning_dimension] = true_data[:,0:conditioning_dimension]
 
-    matched_indexes = matching(true_data,generated_data)
+    ##Matching with the didactic Python code
+    #matched_indexes = matching(true_data,generated_data)
+    ##Matching with the module built from the C++ code
+    matched_indexes = icp_matcher.alternating_icp_matching(generated_data.tolist(),true_data.tolist())
 
     input_noise = input_noise[matched_indexes,:]
 
@@ -176,7 +182,7 @@ for iteration in range(10000):
         plt.ion()
         plt.show()
 
-        time.sleep(2.0);
+        time.sleep(2.0)
         plt.close('all')
         plt.ioff()
       
