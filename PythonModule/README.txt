@@ -4,6 +4,7 @@ You need to set up a few things before using it:
 1) Create environment variable PYTHON_PATH that directs to your Python installation (Something like C:\Users\UserName\Program Files\Python\Python36)
 2) Create environment variable PYTHON_INCLUDE which points to the Python path's include folder.
 3) The project assumes that PYTHON_PATH folder has folder "libs", which contains the Python libraries.
+4) Install Swig and add it to the PATH.
 
 Compiling the library:
 1) Open the solution (sln-file)
